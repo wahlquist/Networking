@@ -1,0 +1,4 @@
+C:\Users\kitte\OneDrive\Desktop\Networking\NetworkingTest\obj\Debug\net8.0\NetworkingTest.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\kitte\OneDrive\Desktop\Networking\NetworkingTest\obj\Debug\net8.0\NetworkingTest.AssemblyInfoInputs.cache
+C:\Users\kitte\OneDrive\Desktop\Networking\NetworkingTest\obj\Debug\net8.0\NetworkingTest.AssemblyInfo.cs
+C:\Users\kitte\OneDrive\Desktop\Networking\NetworkingTest\obj\Debug\net8.0\NetworkingTest.csproj.CoreCompileInputs.cache

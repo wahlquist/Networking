@@ -12,3 +12,4 @@ C:\Users\kitte\OneDrive\Desktop\Networking\Server\obj\Debug\net8.0\refint\Server
 C:\Users\kitte\OneDrive\Desktop\Networking\Server\obj\Debug\net8.0\Server.pdb
 C:\Users\kitte\OneDrive\Desktop\Networking\Server\obj\Debug\net8.0\Server.genruntimeconfig.cache
 C:\Users\kitte\OneDrive\Desktop\Networking\Server\obj\Debug\net8.0\ref\Server.dll
+C:\Users\kitte\OneDrive\Desktop\Networking\Server\obj\Debug\net8.0\Server.sourcelink.json

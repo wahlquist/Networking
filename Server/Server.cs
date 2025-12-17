@@ -4,130 +4,133 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-class Program
+class GuessServer
 {
-    static TcpClient? player1;
-    static TcpClient? player2;
-
-    static int paddle1Y = 5;
-    static int paddle2Y = 5;
-    static int ballX = 20;
-    static int ballY = 10;
-    static int velX = 1;
-    static int velY = 1;
-    static int score1 = 0;
-    static int score2 = 0;
+    static TcpClient? p1, p2;
+    static int secret1 = -1;
+    static int secret2 = -1;
+    static int currentTurn = 0;  
+    static bool gameOver = false;
 
     static void Main()
     {
         TcpListener server = new TcpListener(IPAddress.Any, 5000);
         server.Start();
-        Console.WriteLine("Pong server started.");
+        Console.WriteLine("Number Guessing Server started.");
 
         // Accept Player 1
-        player1 = server.AcceptTcpClient();
+        p1 = server.AcceptTcpClient();
+        Send(p1, "PLAYER:1");
+        Send(p1, "WAITING"); // Tell player 1 to wait for player 2
         Console.WriteLine("Player 1 connected.");
-        Send(player1, "PLAYER:1");
 
         // Accept Player 2
-        player2 = server.AcceptTcpClient();
+        p2 = server.AcceptTcpClient();
+        Send(p2, "PLAYER:2");
+        Send(p2, "WAITING"); // Tell player 2 to wait for the game to start
         Console.WriteLine("Player 2 connected.");
-        Send(player2, "PLAYER:2");
 
         // Start listener threads
-        new Thread(() => HandlePlayer(player1, 1)).Start();
-        new Thread(() => HandlePlayer(player2, 2)).Start();
-
-        // Main game loop = 30 FPS
-        while (true)
-        {
-            UpdateGame();
-            BroadcastState();
-            Thread.Sleep(33);
-        }
+        new Thread(() => HandlePlayer(p1, 1)).Start();
+        new Thread(() => HandlePlayer(p2, 2)).Start();
     }
 
     static void HandlePlayer(TcpClient client, int id)
     {
         NetworkStream s = client.GetStream();
         byte[] buffer = new byte[1024];
+        StringBuilder sb = new StringBuilder();
 
-        while (true)
+        try
         {
-            try
+            while (true)
             {
                 int bytes = s.Read(buffer, 0, buffer.Length);
                 if (bytes == 0) break;
 
-                string msg = Encoding.UTF8.GetString(buffer, 0, bytes);
+                sb.Append(Encoding.UTF8.GetString(buffer, 0, bytes));
 
-                if (msg == "MOVE:UP")
+                while (sb.ToString().Contains('\n'))
                 {
-                    if (id == 1) paddle1Y--;
-                    else paddle2Y--;
-                }
-                else if (msg == "MOVE:DOWN")
-                {
-                    if (id == 1) paddle1Y++;
-                    else paddle2Y++;
+                    int i = sb.ToString().IndexOf('\n');
+                    string msg = sb.ToString(0, i).Trim();
+                    sb.Remove(0, i + 1);
+
+                    HandleMessage(id, msg);
                 }
             }
-            catch
+        }
+        catch { }
+    }
+
+    static void HandleMessage(int id, string msg)
+    {
+        if (gameOver) return;
+
+        // Handle secret number submission
+        if (msg.StartsWith("SECRET"))
+        {
+            int value = int.Parse(msg.Split(':')[1]);
+            if (value < 1 || value > 100) return;
+
+            if (id == 1 && secret1 == -1) secret1 = value;
+            if (id == 2 && secret2 == -1) secret2 = value;
+
+            // Both secrets are set, start the game
+            if (secret1 != -1 && secret2 != -1)
             {
-                break;
+                currentTurn = 1;
+                Send(p1, "TURN:YOU");
+                Send(p2, "TURN:OPPONENT");
             }
+            else
+            {
+                // Remind this player to wait if the other hasn't chosen yet
+                Send(GetClient(id), "WAITING");
+            }
+
+            return;
         }
-    }
 
-    static void UpdateGame()
-    {
-        ballX += velX;
-        ballY += velY;
-
-        // Bounce top/bottom
-        if (ballY <= 0 || ballY >= 20)
-            velY *= -1;
-
-        // Left paddle collision
-        if (ballX == 1 && ballY >= paddle1Y && ballY <= paddle1Y + 3)
-            velX = 1;
-
-        // Right paddle collision
-        if (ballX == 38 && ballY >= paddle2Y && ballY <= paddle2Y + 3)
-            velX = -1;
-
-        // Score left
-        if (ballX <= 0)
+        // Handle guesses
+        if (msg.StartsWith("GUESS"))
         {
-            score2++;
-            ResetBall();
-        }
+            if (id != currentTurn) return;
 
-        // Score right
-        if (ballX >= 40)
+            int guess = int.Parse(msg.Split(':')[1]);
+            int target = (id == 1) ? secret2 : secret1;
+
+            if (guess < target)
+                Send(GetClient(id), "RESULT:Higher");
+            else if (guess > target)
+                Send(GetClient(id), "RESULT:Lower");
+            else
+            {
+                Send(GetClient(id), "RESULT:CORRECT");
+                Send(GetClient(id), "WIN");
+                Send(GetOther(id), "LOSE");
+                gameOver = true;
+                return;
+            }
+
+            // Switch turns
+            currentTurn = (currentTurn == 1) ? 2 : 1;
+            Send(GetClient(currentTurn), "TURN:YOU");
+            Send(GetOther(currentTurn), "TURN:OPPONENT");
+        }
+    }
+
+    static TcpClient GetClient(int id) => (id == 1) ? p1! : p2!;
+    static TcpClient GetOther(int id) => (id == 1) ? p2! : p1!;
+
+    static void Send(TcpClient? c, string msg)
+    {
+        try
         {
-            score1++;
-            ResetBall();
+            if (c == null || !c.Connected) return;
+            byte[] b = Encoding.UTF8.GetBytes(msg + "\n");
+            c.GetStream().Write(b, 0, b.Length);
         }
-    }
-
-    static void ResetBall()
-    {
-        ballX = 20;
-        ballY = 10;
-        velX *= -1;
-    }
-
-    static void BroadcastState()
-    {
-        string msg = $"STATE:{ballX}:{ballY}:{paddle1Y}:{paddle2Y}:{score1}:{score2}";
-        if (player1 != null) Send(player1, msg);
-        if (player2 != null) Send(player2, msg);
-    }
-
-    static void Send(TcpClient c, string msg)
-    {
-        byte[] b = Encoding.UTF8.GetBytes(msg);
-        c.GetStream().Write(b);
+        catch { }
     }
 }

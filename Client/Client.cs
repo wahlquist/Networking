@@ -3,103 +3,113 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-class Program
+class GuessClient
 {
-    static int ballX, ballY;
-    static int p1Y, p2Y;
-    static int score1, score2;
+    
     static int playerId = 0;
+    static bool myTurn = false;
+    static bool choosingSecret = true;
 
     static void Main()
     {
         TcpClient client = new TcpClient("127.0.0.1", 5000);
         NetworkStream stream = client.GetStream();
 
-        // Listen thread
         new Thread(() => Listen(stream)).Start();
 
-        while (playerId == 0) { }
-
-        ConsoleKey key;
         while (true)
-        {
-            key = Console.ReadKey(true).Key;
+{
+    if (choosingSecret)
+    {
+        Console.Write("Choose your secret number (1–100): ");
+        string secret = Console.ReadLine()!;
+        Send(stream, $"SECRET:{secret}");
+        choosingSecret = false; // done choosing secret
+        continue;
+    }
 
-            if (key == ConsoleKey.W || key == ConsoleKey.UpArrow)
-                Send(stream, "MOVE:UP");
+    if (!myTurn)
+    {
+        Thread.Sleep(100);
+        continue;
+    }
 
-            if (key == ConsoleKey.S || key == ConsoleKey.DownArrow)
-                Send(stream, "MOVE:DOWN");
-        }
+    // now it’s guessing turn
+    Console.Write("Enter your guess: ");
+    string guess = Console.ReadLine()!;
+    Send(stream, $"GUESS:{guess}");
+    myTurn = false;
+}
+
     }
 
     static void Listen(NetworkStream s)
     {
         byte[] buffer = new byte[1024];
+        StringBuilder sb = new();
 
         while (true)
         {
             int bytes = s.Read(buffer, 0, buffer.Length);
-            string msg = Encoding.UTF8.GetString(buffer, 0, bytes);
+            sb.Append(Encoding.UTF8.GetString(buffer, 0, bytes));
 
-            if (msg.StartsWith("PLAYER"))
+            while (sb.ToString().Contains('\n'))
             {
-                playerId = int.Parse(msg.Split(':')[1]);
-                continue;
-            }
+                int i = sb.ToString().IndexOf('\n');
+                string msg = sb.ToString(0, i).Trim();
+                sb.Remove(0, i + 1);
 
-            if (msg.StartsWith("STATE"))
-            {
-                string[] p = msg.Split(':');
-                ballX = int.Parse(p[1]);
-                ballY = int.Parse(p[2]);
-                p1Y = int.Parse(p[3]);
-                p2Y = int.Parse(p[4]);
-                score1 = int.Parse(p[5]);
-                score2 = int.Parse(p[6]);
-
-                Draw();
+                HandleMessage(msg);
             }
         }
     }
 
-    static void Draw()
+    static void HandleMessage(string msg)
     {
-        Console.Clear();
-
-        // Draw score
-        Console.WriteLine($"Player 1: {score1}    Player 2: {score2}\n");
-
-        char[,] screen = new char[22, 42];
-
-        // Fill with spaces
-        for (int y = 0; y < 22; y++)
-            for (int x = 0; x < 42; x++)
-                screen[y, x] = ' ';
-
-        // Ball
-        screen[ballY, ballX] = 'O';
-
-        // Player 1 paddle
-        for (int i = 0; i < 4; i++)
-            screen[p1Y + i, 0] = '|';
-
-        // Player 2 paddle
-        for (int i = 0; i < 4; i++)
-            screen[p2Y + i, 41] = '|';
-
-        // Render
-        for (int y = 0; y < 22; y++)
+        if (msg.StartsWith("PLAYER"))
         {
-            for (int x = 0; x < 42; x++)
-                Console.Write(screen[y, x]);
-            Console.WriteLine();
+            playerId = int.Parse(msg.Split(':')[1]);
+            Console.WriteLine($"You are Player {playerId}");
+        }
+
+        if (msg == "TURN:YOU")
+        {
+            myTurn = true;
+            Console.WriteLine("Your turn");
+        }
+
+        if (msg == "TURN:OPPONENT")
+        {
+            myTurn = false;
+            Console.WriteLine("Opponent's turn...");
+        }
+
+        if (msg.StartsWith("RESULT"))
+        {
+            Console.WriteLine(msg.Split(':')[1]);
+        }
+
+        if (msg == "WIN")
+        {
+            Console.WriteLine("YOU WIN ");
+            Environment.Exit(0);
+        }
+
+        if (msg == "LOSE")
+        {
+            Console.WriteLine("YOU LOSE 💀");
+            Environment.Exit(0);
+        }
+
+        if (msg == "WAITING")
+        {
+            Console.WriteLine("Waiting for the other player to choose their secret...");
         }
     }
 
     static void Send(NetworkStream s, string msg)
     {
-        byte[] b = Encoding.UTF8.GetBytes(msg);
-        s.Write(b);
+        byte[] b = Encoding.UTF8.GetBytes(msg + "\n");
+        s.Write(b, 0, b.Length);
     }
 }

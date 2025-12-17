@@ -1,0 +1,45 @@
+# Project Title (Update)
+
+a sort of battle ship between to different clients in a server but its just a guessing game
+
+
+## Instructions for Build and Use
+
+Steps to build and/or run the software:
+
+1. open vs code
+2.
+3.
+
+Instructions for using the software:
+
+1. open server first. 
+2.open the clients 
+3.
+
+## Development Environment 
+
+To recreate the development environment, you need the following software and/or libraries with the specified versions:
+
+*using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+
+## Useful Websites to Learn More
+
+I found these websites useful in developing this software:
+
+* [post.bytes](https://post.bytes.com/forum/topic/java/15631-what-to-use-to-network-a-simple-battleship-game)
+*[Chatgpt]
+*
+
+## Future Work
+
+The following items I plan to fix, improve, and/or add to this project in the future:
+
+* [ ] maybe a grid for it
+* [ ] more people?
+* [ ]
